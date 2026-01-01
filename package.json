@@ -1,0 +1,27 @@
+{
+  "name": "@nuwa/visual-block-editor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Reusable Lit components for a Visual Block Editor (data provider + editor + overlays).",
+  "license": "MIT",
+  "scripts": {
+    "dev": "web-dev-server --node-resolve --open --watch --app-index demo/index.html",
+    "build": "rollup -c",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rimraf dist .rollup.cache"
+  },
+  "dependencies": {
+    "lit": "^3.1.0",
+    "@lit/context": "^1.1.0"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^26.0.1",
+    "@rollup/plugin-node-resolve": "^15.3.0",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-typescript": "^11.1.6",
+    "@web/dev-server": "^0.4.6",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.5.4"
+  }
+}

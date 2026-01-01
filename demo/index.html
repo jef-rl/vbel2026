@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Visual Block Editor (Lit)</title>
+    <style>
+      html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; }
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+      .root { display:flex; height:100%; width:100%; }
+      .left { flex: 1; position:relative; }
+      .right { width: 460px; border-left: 1px solid #e5e7eb; background:#fff; overflow:auto; padding:16px; }
+      .note { font-size: 12px; color:#6b7280; line-height: 1.5; }
+      code { background: #f3f4f6; padding: 2px 6px; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <div class="root">
+      <div class="left">
+        <!--
+          Provider (data + UI state)
+          - Click the floating button to load an id
+        -->
+        <visual-block-data base-url="https://us-central1-lozzuck.cloudfunctions.net/blocks">
+          <visual-block-editor></visual-block-editor>
+        </visual-block-data>
+      </div>
+      <div class="right">
+        <h3 style="margin:0 0 8px 0;">Demo</h3>
+        <div class="note">
+          This panel is just demo UI. The editor itself is the <code>&lt;visual-block-editor&gt;</code> component.
+          <br /><br />
+          Build artifacts:
+          <ul>
+            <li><code>dist/esm/index.js</code> (ESM)</li>
+            <li><code>dist/iife/visual-block-editor.iife.js</code> (IIFE)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import '../src/register.ts';
+    </script>
+  </body>
+</html>
