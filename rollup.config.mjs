@@ -19,7 +19,12 @@ export default [
     plugins: [
       resolve({ browser: true }),
       commonjs(),
-      typescript({ tsconfig: './tsconfig.json' })
+      typescript({ 
+        tsconfig: './tsconfig.json',
+        declaration: true,
+        declarationDir: 'dist/esm/types',
+        outDir: 'dist/esm'
+      })
     ]
   },
 
@@ -31,12 +36,18 @@ export default [
       file: 'dist/iife/visual-block-editor.iife.js',
       format: 'iife',
       name: 'VisualBlockEditor',
-      sourcemap: true
+      sourcemap: true,
+      inlineDynamicImports: true
     },
     plugins: [
       resolve({ browser: true }),
       commonjs(),
-      typescript({ tsconfig: './tsconfig.json' }),
+      typescript({ 
+        tsconfig: './tsconfig.json',
+        declaration: false,
+        declarationMap: false,
+        outDir: 'dist/iife'
+      }),
       terser()
     ]
   }

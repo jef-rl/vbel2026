@@ -194,7 +194,7 @@ export class VisualBlockGrid extends LitElement {
 
         const hitRects = Object.values(rects)
           .filter((r: any) => gridX >= r.x && gridX < r.x + r.w && gridY >= r.y && gridY < r.y + r.h)
-          .sort((a: any, b: any) => (b.z || 0) - (a.z || 0));
+          .sort((a: any, b: any) => (b.z || 0) - (a.z || 0)) as any[];
 
         if (hitRects.length > 1) {
           const currentIndex = hitRects.findIndex((r: any) => r.id === this.ghost.primaryId);

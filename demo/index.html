@@ -21,26 +21,33 @@
           Provider (data + UI state)
           - Click the floating button to load an id
         -->
-        <visual-block-data base-url="https://us-central1-lozzuck.cloudfunctions.net/blocks">
+        <visual-block-data id="data-provider" base-url="https://us-central1-lozzuck.cloudfunctions.net/blocks">
           <visual-block-editor></visual-block-editor>
         </visual-block-data>
       </div>
-      <div class="right">
-        <h3 style="margin:0 0 8px 0;">Demo</h3>
-        <div class="note">
-          This panel is just demo UI. The editor itself is the <code>&lt;visual-block-editor&gt;</code> component.
-          <br /><br />
-          Build artifacts:
-          <ul>
-            <li><code>dist/esm/index.js</code> (ESM)</li>
-            <li><code>dist/iife/visual-block-editor.iife.js</code> (IIFE)</li>
-          </ul>
-        </div>
-      </div>
     </div>
 
+    <!-- Use the built ESM bundle to avoid MIME type issues with .ts files in the browser -->
+    <script type="module" src="../dist/esm/index.js"></script>
+
     <script type="module">
-      import '../src/register.ts';
+      // Wait for the custom elements to be defined
+      customElements.whenDefined('visual-block-data').then(() => {
+        const dataProvider = document.getElementById('data-provider');
+
+        // Example AI Client configuration
+        // In a real app, this would call your backend proxy
+        dataProvider.aiClient = async (prompt, systemInstruction) => {
+          console.log('AI Request:', { prompt, systemInstruction });
+          
+          // Mocking a delay
+          await new Promise(resolve => setTimeout(resolve, 1000));
+
+          return `This is a mock response for: "${prompt.substring(0, 30)}..."`;
+        };
+
+        console.log('AI Client configured.');
+      });
     </script>
   </body>
 </html>

@@ -187,14 +187,22 @@ export class VisualBlockEditor extends LitElement {
         <visual-block-toolbar></visual-block-toolbar>
 
         <div class="viewport" @mousedown=${() => this.handleBackgroundClick()}>
-          <div class="canvas" style=${styleMap(containerStyle)}>
-            <visual-block-render></visual-block-render>
-            <visual-block-grid></visual-block-grid>
-          </div>
-
-          <visual-block-preview></visual-block-preview>
-
-          ${hasContent ? html`<visual-block-projection></visual-block-projection>` : null}
+          ${hasContent 
+            ? html`
+              <div class="canvas" style=${styleMap(containerStyle)}>
+                <visual-block-render></visual-block-render>
+                <visual-block-grid></visual-block-grid>
+              </div>
+              <visual-block-preview></visual-block-preview>
+              <visual-block-projection></visual-block-projection>
+            `
+            : html`
+              <div style="margin-top: 100px; color: #6b7280; text-align: center;">
+                <p>No data loaded.</p>
+                <p>Click the FAB in the bottom right to load a block.</p>
+              </div>
+            `
+          }
         </div>
 
         <visual-block-ai-modal></visual-block-ai-modal>
