@@ -1,17 +1,40 @@
 import { LitElement, html, css } from 'lit';
 import { ContextConsumer } from '@lit/context';
-import { editorContext } from '../contexts.js';
+import { editorContext, blockDataContext, uiStateContext } from '../contexts.js';
 import { DEFAULT_CONTEXT } from '../defaults.js';
 
+/**
+ * <visual-block-inspector>
+ */
 export class VisualBlockInspector extends LitElement {
-  private contextState: any = DEFAULT_CONTEXT;
+  
+  private _blockData: any = {};
+  private _uiState: any = {};
+  private _editorState: any = {};
 
-  private _consumer = new ContextConsumer(this, {
+  private _blockDataConsumer = new ContextConsumer(this, {
+    context: blockDataContext,
+    subscribe: true,
+    callback: (value) => {
+      this._blockData = value || {};
+      this.requestUpdate();
+    },
+  });
+
+  private _uiStateConsumer = new ContextConsumer(this, {
+    context: uiStateContext,
+    subscribe: true,
+    callback: (value) => {
+      this._uiState = value || {};
+      this.requestUpdate();
+    },
+  });
+
+  private _editorConsumer = new ContextConsumer(this, {
     context: editorContext,
     subscribe: true,
     callback: (value) => {
-      console.log('[Inspector] Context updated:', value);
-      this.contextState = value ?? DEFAULT_CONTEXT;
+      this._editorState = value || {};
       this.requestUpdate();
     },
   });
@@ -32,6 +55,7 @@ export class VisualBlockInspector extends LitElement {
       z-index: 2000;
       font-family: system-ui, -apple-system, sans-serif;
       transition: transform 0.2s ease-in-out;
+      border: 2px solid blue; /* Debug border */
     }
     
     :host([hidden]) {
@@ -68,9 +92,24 @@ export class VisualBlockInspector extends LitElement {
   `;
 
   render() {
-    console.log('[Inspector] Rendering. State:', this.contextState);
-    const { selectedIds, blockData, rects } = this.contextState;
+    const selectedIds = this._uiState.selectedIds || [];
+    const blockData = this._blockData;
+    const rects = this._editorState.rects || {};
 
+    return html`
+        <div>
+            <h3>Inspector Debug</h3>
+            <div>Selected Count: ${selectedIds.length}</div>
+            <div>Rects Count: ${Object.keys(rects).length}</div>
+            <div>Data Keys: ${Object.keys(blockData).length}</div>
+        </div>
+        <hr>
+
+        ${this.renderContent(selectedIds, blockData, rects)}
+    `;
+  }
+
+  renderContent(selectedIds: any[], blockData: any, rects: any) {
     if (!selectedIds || selectedIds.length === 0) {
       return html`<div class="empty-state">Select a block to inspect details</div>`;
     }
@@ -90,13 +129,12 @@ export class VisualBlockInspector extends LitElement {
     }
 
     const id = selectedIds[0];
-    const rect = rects ? rects[id] : null;
+    const rect = rects[id];
     
     if (!rect) {
         return html`
             <div class="empty-state">
-                Selected item ID <b>${id}</b> not found in rects.<br>
-                Rects count: ${rects ? Object.keys(rects).length : 0}
+                Selected item ID <b>${id}</b> not found in layout.<br>
             </div>`;
     }
 

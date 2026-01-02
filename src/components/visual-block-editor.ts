@@ -86,7 +86,7 @@ export class VisualBlockEditor extends LitElement {
   }
 
   private _processLayoutData(data: any) {
-    this.blockData = data;
+    this.blockData = { ...data };
 
     const layoutKey = 'layout_lg';
     const layoutData = data[layoutKey] || {};
@@ -178,6 +178,7 @@ export class VisualBlockEditor extends LitElement {
     const hasContent = this.rects && Object.keys(this.rects).length > 0;
     if (this.mode === 'design') containerStyle.minHeight = `${height}px`;
 
+    // Note: Removed local ?hidden control. Inspector now manages its own visibility based on context.
     const showInspector = this.selectedIds.length > 0;
 
     return html`
@@ -203,7 +204,7 @@ export class VisualBlockEditor extends LitElement {
           }
         </div>
 
-        <visual-block-inspector ?hidden=${!showInspector}></visual-block-inspector>
+        <visual-block-inspector></visual-block-inspector>
         <visual-block-ai-modal></visual-block-ai-modal>
       </div>
     `;

@@ -16,6 +16,7 @@ export function registerVisualBlockEditor() {
   import('./components/visual-block-grid.js');
   import('./components/visual-block-preview.js');
   import('./components/visual-block-projection.js');
+  import('./components/visual-block-inspector.js');
 }
 
 // Auto-register when someone imports the IIFE bundle (src/register.ts is its entry)
