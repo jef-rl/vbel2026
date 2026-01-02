@@ -27,22 +27,34 @@
       </div>
     </div>
 
-    <!-- Use the built ESM bundle to avoid MIME type issues with .ts files in the browser -->
-    <script type="module" src="../dist/esm/index.js"></script>
+    <!-- Test Lit component -->
+    <test-lit-component></test-lit-component>
+
+    <!-- Use the built IIFE bundle for broader compatibility -->
+    <script src="../dist/iife/visual-block-editor.iife.js"></script>
 
     <script type="module">
+      import { LitElement, html, css } from 'lit';
+
+      class TestLitComponent extends LitElement {
+        static styles = css`div { color: green; font-weight: bold; }`;
+        render() { return html`<div>Lit is working!</div>`; }
+      }
+      customElements.define('test-lit-component', TestLitComponent);
+
+      // Ensure the global register function is called for the IIFE bundle
+      if (typeof window.VisualBlockEditor !== 'undefined' && typeof window.VisualBlockEditor.registerVisualBlockEditor === 'function') {
+        window.VisualBlockEditor.registerVisualBlockEditor();
+      }
+
       // Wait for the custom elements to be defined
       customElements.whenDefined('visual-block-data').then(() => {
         const dataProvider = document.getElementById('data-provider');
 
         // Example AI Client configuration
-        // In a real app, this would call your backend proxy
         dataProvider.aiClient = async (prompt, systemInstruction) => {
           console.log('AI Request:', { prompt, systemInstruction });
-          
-          // Mocking a delay
           await new Promise(resolve => setTimeout(resolve, 1000));
-
           return `This is a mock response for: "${prompt.substring(0, 30)}..."`;
         };
 
