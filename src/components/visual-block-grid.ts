@@ -74,18 +74,14 @@ export class VisualBlockGrid extends LitElement {
     e.preventDefault();
     e.stopPropagation();
 
-    const isIncreasing = e.deltaY > 0; // Wheel down = increase Z, Wheel up = decrease Z
+    const isIncreasing = e.deltaY > 0; // Wheel down = forward, Wheel up = backward
     
-    // 1. Find all rectangles that are actually overlapping the CURRENT selection
-    // For simplicity, we'll check overlap with the first selected item, or all selected items as a group.
-    // Let's use the first selected item's geometry as the anchor for the "stack".
+    // 1. Identify the overlapping stack relative to the selection
     const anchorId = selectedIds[0];
     const anchorRect = rects[anchorId];
     if (!anchorRect) return;
 
     const allRects = Object.values(rects) as any[];
-    
-    // Filter to ONLY those rectangles that intersect with our anchor
     const stackRects = allRects.filter(r => {
         return r.x < anchorRect.x + anchorRect.w &&
                r.x + r.w > anchorRect.x &&
@@ -93,26 +89,30 @@ export class VisualBlockGrid extends LitElement {
                r.y + r.h > anchorRect.y;
     }).sort((a, b) => (a.z || 0) - (b.z || 0));
 
-    // Now perform the swap logic ONLY within this stack
     const selectedInStack = stackRects.filter(r => selectedIds.includes(r.id));
     if (selectedInStack.length === 0) return;
 
     const updates: any[] = [];
 
+    // Perform Z-index rotation to maintain relative order and the set of available Z values
     if (isIncreasing) {
       const highestSelected = selectedInStack[selectedInStack.length - 1];
       const highestIdx = stackRects.findIndex(r => r.id === highestSelected.id);
       
       if (highestIdx < stackRects.length - 1) {
         const targetRect = stackRects[highestIdx + 1];
-        const lowestSelectedZ = selectedInStack[0].z || 0;
-        const targetZ = targetRect.z || 0;
-        const shift = Math.max(1, (targetZ - lowestSelectedZ) + 1);
-
-        selectedInStack.forEach(r => {
-          updates.push({ id: r.id, rect: { ...r, z: (r.z || 0) + shift } });
+        
+        // Group: [Selected items] + [Target item]
+        // Current Z values: z_a, z_b, z_c... z_target
+        // New order: [Target item] + [Selected items]
+        const affectedItems = [...selectedInStack, targetRect];
+        const zValues = affectedItems.map(item => item.z || 0).sort((a, b) => a - b);
+        
+        // Target gets the lowest Z, selected items get the rest
+        updates.push({ id: targetRect.id, rect: { ...targetRect, z: zValues[0] } });
+        selectedInStack.forEach((r, i) => {
+            updates.push({ id: r.id, rect: { ...r, z: zValues[i + 1] } });
         });
-        updates.push({ id: targetRect.id, rect: { ...targetRect, z: lowestSelectedZ } });
       }
     } else {
       const lowestSelected = selectedInStack[0];
@@ -120,14 +120,18 @@ export class VisualBlockGrid extends LitElement {
       
       if (lowestIdx > 0) {
         const targetRect = stackRects[lowestIdx - 1];
-        const highestSelectedZ = selectedInStack[selectedInStack.length - 1].z || 0;
-        const targetZ = targetRect.z || 0;
-        const shift = Math.max(1, (highestSelectedZ - targetZ) + 1);
-
-        selectedInStack.forEach(r => {
-          updates.push({ id: r.id, rect: { ...r, z: Math.max(0, (r.z || 0) - shift) } });
+        
+        // Group: [Target item] + [Selected items]
+        // Current Z values: z_target, z_a, z_b...
+        // New order: [Selected items] + [Target item]
+        const affectedItems = [targetRect, ...selectedInStack];
+        const zValues = affectedItems.map(item => item.z || 0).sort((a, b) => a - b);
+        
+        // Selected items get the lowest Zs, target gets the highest
+        selectedInStack.forEach((r, i) => {
+            updates.push({ id: r.id, rect: { ...r, z: zValues[i] } });
         });
-        updates.push({ id: targetRect.id, rect: { ...targetRect, z: highestSelectedZ } });
+        updates.push({ id: targetRect.id, rect: { ...targetRect, z: zValues[zValues.length - 1] } });
       }
     }
 
@@ -176,7 +180,6 @@ export class VisualBlockGrid extends LitElement {
 
     const originalSelectedIds = [...(selectedIds ?? [])];
 
-    // Update selection based on interaction type and modifier keys
     let newSelection: string[] = [...originalSelectedIds];
     if (interactionType === 'MOVE' && primaryIdToSelect) {
         if (e.ctrlKey || e.metaKey || e.shiftKey) {
@@ -416,8 +419,8 @@ export class VisualBlockGrid extends LitElement {
               ${isSelected
                 ? html`<div class="badge">Block</div>
                     ${(selectedIds?.length ?? 0) === 1
-                      ? html`<div class="handle nw" data-direction="nw"></div><div class="handle ne" data-direction="ne"></div>
-                          <div class="handle sw" data-direction="sw"></div><div class="handle se" data-direction="se"></div>`
+                      ? html`<div class="handle nw"></div><div class="handle ne"></div>
+                          <div class="handle sw"></div><div class="handle se"></div>`
                       : null}`
                 : null}
             </div>`;
