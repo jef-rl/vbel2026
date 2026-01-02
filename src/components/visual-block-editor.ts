@@ -11,10 +11,6 @@ import { DEFAULT_CONTEXT } from '../defaults.js';
  * - Consume raw block data + ui state.
  * - Compute derived editor state: rects, grid metrics, container size.
  * - Provide the aggregated editorContext for render/overlay/preview/projection children.
- *
- * Rationale as a building block:
- * - This is the "orchestrator" between raw data and specialized subcomponents.
- * - It doesn't fetch data and it doesn't own UI state — which keeps it reusable.
  */
 export class VisualBlockEditor extends LitElement {
   static properties = {
@@ -182,8 +178,10 @@ export class VisualBlockEditor extends LitElement {
     const hasContent = this.rects && Object.keys(this.rects).length > 0;
     if (this.mode === 'design') containerStyle.minHeight = `${height}px`;
 
+    const showInspector = this.selectedIds.length > 0;
+
     return html`
-      <div class="app">
+      <div class="app" style=${styleMap({ paddingRight: showInspector ? '320px' : '0' })}>
         <visual-block-toolbar></visual-block-toolbar>
 
         <div class="viewport" @mousedown=${() => this.handleBackgroundClick()}>
@@ -205,6 +203,7 @@ export class VisualBlockEditor extends LitElement {
           }
         </div>
 
+        <visual-block-inspector ?hidden=${!showInspector}></visual-block-inspector>
         <visual-block-ai-modal></visual-block-ai-modal>
       </div>
     `;
@@ -212,7 +211,7 @@ export class VisualBlockEditor extends LitElement {
 
   static styles = css`
     :host { display: block; width: 100%; height: 100%; background: #f3f4f6; color: #333; }
-    .app { display: flex; flex-direction: column; height: 100%; }
+    .app { display: flex; flex-direction: column; height: 100%; transition: padding-right 0.2s ease-in-out; }
     .viewport {
       flex: 1;
       overflow: auto;

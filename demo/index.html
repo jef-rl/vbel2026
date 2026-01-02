@@ -27,21 +27,10 @@
       </div>
     </div>
 
-    <!-- Test Lit component -->
-    <test-lit-component></test-lit-component>
-
     <!-- Use the built IIFE bundle for broader compatibility -->
     <script src="../dist/iife/visual-block-editor.iife.js"></script>
 
-    <script type="module">
-      import { LitElement, html, css } from 'lit';
-
-      class TestLitComponent extends LitElement {
-        static styles = css`div { color: green; font-weight: bold; }`;
-        render() { return html`<div>Lit is working!</div>`; }
-      }
-      customElements.define('test-lit-component', TestLitComponent);
-
+    <script>
       // Ensure the global register function is called for the IIFE bundle
       if (typeof window.VisualBlockEditor !== 'undefined' && typeof window.VisualBlockEditor.registerVisualBlockEditor === 'function') {
         window.VisualBlockEditor.registerVisualBlockEditor();
