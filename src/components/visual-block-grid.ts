@@ -10,16 +10,14 @@ import { clampGrid } from '../utils/grid.js';
  *
  * Responsibility:
  * - The edit overlay: selection, drag-move, resize, z-index wheel.
+ * - Marquee selection (click-drag on background).
  * - Never mutates layout directly. Emits `rect-update` with patches.
- *
- * Rationale as a building block:
- * - All "interaction surface" logic lives here, separate from rendering and data fetching.
- * - Apps can replace the interaction layer (e.g. different UX) without touching the renderer/editor.
  */
 export class VisualBlockGrid extends LitElement {
   static properties = {
     hoveredId: { type: String, state: true },
     ghost: { attribute: false, state: true },
+    marquee: { attribute: false, state: true },
   };
 
   private contextState: any = DEFAULT_CONTEXT;
@@ -34,16 +32,17 @@ export class VisualBlockGrid extends LitElement {
 
   hoveredId: string | null = null;
   ghost: any = null;
+  marquee: { x1: number; y1: number; x2: number; y2: number } | null = null;
 
   private handleWindowMouseMove = (e: MouseEvent) => this._handleWindowMouseMove(e);
-  private handleWindowMouseUp = () => this._handleWindowMouseUp();
+  private handleWindowMouseUp = (e: MouseEvent) => this._handleWindowMouseUp(e);
   private handleHostMouseDown = (e: MouseEvent) => this._handleHostMouseDown(e);
   private handleWheel = (e: WheelEvent) => this._handleWheel(e);
 
   connectedCallback() {
     super.connectedCallback();
-    window.addEventListener('mousemove', this.handleWindowMouseMove);
-    window.addEventListener('mouseup', this.handleWindowMouseUp);
+    window.addEventListener('mousemove', this.handleWindowMouseMove, { passive: false });
+    window.addEventListener('mouseup', this.handleWindowMouseUp, { passive: false });
     this.addEventListener('mousedown', this.handleHostMouseDown);
     this.addEventListener('wheel', this.handleWheel, { passive: false });
   }
@@ -77,24 +76,89 @@ export class VisualBlockGrid extends LitElement {
     e.preventDefault();
     e.stopPropagation();
 
-    const direction = e.deltaY > 0 ? 'up' : 'down';
+    // Browser scroll direction: deltaY > 0 is scroll down (increase Z), deltaY < 0 is scroll up (decrease Z)
+    const isIncreasing = e.deltaY > 0;
+    
+    // Sort all rects by their current Z-index
+    const allRects = Object.values(rects).sort((a: any, b: any) => (a.z || 0) - (b.z || 0)) as any[];
+    
+    // Find the indices of the selected elements in the sorted array
+    const selectedIndices = allRects.map((r, i) => selectedIds.includes(r.id) ? i : -1).filter(i => i !== -1);
+    
+    if (selectedIndices.length === 0) return;
+
     const updates: any[] = [];
 
-    selectedIds.forEach((id: string) => {
-      const rect = rects[id];
-      if (!rect) return;
-      const z = direction === 'up' ? (rect.z || 0) + 1 : Math.max(0, (rect.z || 0) - 1);
-      updates.push({ id, rect: { ...rect, z } });
-    });
+    if (isIncreasing) {
+      // Find the element with the highest index in the selection
+      const highestIdx = Math.max(...selectedIndices);
+      
+      // If there's an element above the selection
+      if (highestIdx < allRects.length - 1) {
+        const targetIdx = highestIdx + 1;
+        const targetRect = allRects[targetIdx];
+        
+        // We need to move the entire selection group above targetRect
+        // To do this simply while maintaining relative order:
+        // 1. Find the Z value of the targetRect
+        // 2. The selection group's new base Z should be targetRect.z + 1
+        // 3. The targetRect's new Z should be the old lowest Z of the selection
+        
+        const lowestSelectedIdx = Math.min(...selectedIndices);
+        const lowestSelectedZ = allRects[lowestSelectedIdx].z || 0;
+        const targetZ = targetRect.z || 0;
+        
+        const shift = Math.max(1, (targetZ - lowestSelectedZ) + 1);
 
-    if (updates.length) this.dispatchUiEvent('rect-update', updates);
+        selectedIndices.forEach(idx => {
+          const r = allRects[idx];
+          updates.push({ id: r.id, rect: { ...r, z: (r.z || 0) + shift } });
+        });
+        
+        // Move target down
+        updates.push({ id: targetRect.id, rect: { ...targetRect, z: lowestSelectedZ } });
+      }
+    } else {
+      // Move selection DOWN the stack (decrease Z)
+      const lowestIdx = Math.min(...selectedIndices);
+      
+      if (lowestIdx > 0) {
+        const targetIdx = lowestIdx - 1;
+        const targetRect = allRects[targetIdx];
+        
+        const highestSelectedIdx = Math.max(...selectedIndices);
+        const highestSelectedZ = allRects[highestSelectedIdx].z || 0;
+        const targetZ = targetRect.z || 0;
+        
+        const shift = Math.max(1, (highestSelectedZ - targetZ) + 1);
+
+        selectedIndices.forEach(idx => {
+          const r = allRects[idx];
+          updates.push({ id: r.id, rect: { ...r, z: Math.max(0, (r.z || 0) - shift) } });
+        });
+        
+        // Move target up
+        updates.push({ id: targetRect.id, rect: { ...targetRect, z: highestSelectedZ } });
+      }
+    }
+
+    if (updates.length) {
+      this.dispatchUiEvent('rect-update', updates);
+    }
   }
 
-  private _handleHostMouseDown(_e: MouseEvent) {
+  private _handleHostMouseDown(e: MouseEvent) {
     const { mode } = this.contextState;
     if (mode !== 'design') return;
-    this.dispatchUiEvent('selection-change', []);
+
+    const { x, y } = this.getMouseCoords(e);
+    
+    if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        this.dispatchUiEvent('selection-change', []);
+    }
+    
     this.ghost = null;
+    this.marquee = { x1: x, y1: y, x2: x, y2: y };
   }
 
   private handleMouseDownItem(e: MouseEvent, clickedId: string, type: 'MOVE' | 'RESIZE', direction = 'se') {
@@ -107,7 +171,7 @@ export class VisualBlockGrid extends LitElement {
     const { x, y } = this.getMouseCoords(e);
 
     let newSelection: string[] = [...(selectedIds ?? [])];
-    if (e.ctrlKey || e.metaKey) {
+    if (e.ctrlKey || e.metaKey || e.shiftKey) {
       if (newSelection.includes(clickedId)) newSelection = newSelection.filter((id) => id !== clickedId);
       else newSelection.push(clickedId);
     } else if (!newSelection.includes(clickedId)) {
@@ -132,6 +196,13 @@ export class VisualBlockGrid extends LitElement {
   }
 
   private _handleWindowMouseMove(e: MouseEvent) {
+    if (this.marquee) {
+        const { x, y } = this.getMouseCoords(e);
+        this.marquee = { ...this.marquee, x2: x, y2: y };
+        this.requestUpdate();
+        return;
+    }
+
     if (!this.ghost) return;
 
     const { gridConfig } = this.contextState;
@@ -182,7 +253,40 @@ export class VisualBlockGrid extends LitElement {
     }
   }
 
-  private _handleWindowMouseUp() {
+  private _handleWindowMouseUp(e: MouseEvent) {
+    if (this.marquee) {
+        const { x1, y1, x2, y2 } = this.marquee;
+        const left = Math.min(x1, x2);
+        const top = Math.min(y1, y2);
+        const width = Math.abs(x1 - x2);
+        const height = Math.abs(y1 - y2);
+        
+        const { rects, gridConfig, selectedIds } = this.contextState;
+        const { padding, stepX, stepY } = gridConfig;
+        
+        const newlySelected: string[] = e.ctrlKey || e.metaKey || e.shiftKey ? [...selectedIds] : [];
+        
+        if (width > 2 || height > 2) {
+            Object.values(rects).forEach((r: any) => {
+                const rLeft = padding + r.x * stepX;
+                const rTop = padding + r.y * stepY;
+                const rRight = rLeft + r.w * stepX;
+                const rBottom = rTop + r.h * stepY;
+                
+                // Check for intersection
+                if (rLeft < (left + width) && rRight > left && rTop < (top + height) && rBottom > top) {
+                    if (!newlySelected.includes(r.id)) {
+                        newlySelected.push(r.id);
+                    }
+                }
+            });
+            this.dispatchUiEvent('selection-change', newlySelected);
+        }
+
+        this.marquee = null;
+        return;
+    }
+
     if (!this.ghost) return;
 
     const { rects, selectedIds } = this.contextState;
@@ -201,13 +305,13 @@ export class VisualBlockGrid extends LitElement {
           const nextIndex = (currentIndex + 1) % hitRects.length;
           this.dispatchUiEvent('selection-change', [hitRects[nextIndex].id]);
         }
-      } else {
+      } else if (this.ghost.wasDragged) {
         const updates = Object.keys(this.ghost.items).map((id) => ({ id, rect: this.ghost.items[id].currentRect }));
         this.dispatchUiEvent('rect-update', updates);
       }
     }
 
-    if (this.ghost.type === 'RESIZE') {
+    if (this.ghost.type === 'RESIZE' && this.ghost.wasDragged) {
       const updates = Object.keys(this.ghost.items).map((id) => ({ id, rect: this.ghost.items[id].currentRect }));
       this.dispatchUiEvent('rect-update', updates);
     }
@@ -247,6 +351,20 @@ export class VisualBlockGrid extends LitElement {
     for (let r = 1; r <= rowCount; r++) gridLines.push(html`<div class="line-h" style="grid-row: ${r}; align-self: start;"></div>`);
     gridLines.push(html`<div class="line-h" style="grid-row: ${rowCount}; align-self: end;"></div>`);
 
+    let marqueeStyle = {};
+    if (this.marquee) {
+        const left = Math.min(this.marquee.x1, this.marquee.x2);
+        const top = Math.min(this.marquee.y1, this.marquee.y2);
+        const width = Math.abs(this.marquee.x1 - this.marquee.x2);
+        const height = Math.abs(this.marquee.y1 - this.marquee.y2);
+        marqueeStyle = {
+            left: `${left}px`,
+            top: `${top}px`,
+            width: `${width}px`,
+            height: `${height}px`,
+        };
+    }
+
     return html`
       <div class="grid-overlay" style=${styleMap(gridOverlayStyle)}>
         ${gridLines}
@@ -259,11 +377,17 @@ export class VisualBlockGrid extends LitElement {
           if (this.ghost?.type === 'MOVE' && this.ghost.items?.[rect.id]) return null;
 
           let borderColor = 'transparent';
-          let zIndex = (rect.z || 0) + 50;
+          let zIndex = (rect.z || 0) + 1000; // Base z-index for wireframes
           let bgColor = 'transparent';
 
-          if (isSelected) { borderColor = 'rgba(79, 70, 229, 0.8)'; zIndex = 1000; }
-          else if (isHovered) { bgColor = 'rgba(79, 70, 229, 0.1)'; borderColor = 'rgba(79, 70, 229, 0.5)'; zIndex = 900; }
+          if (isSelected) { 
+            borderColor = 'rgba(79, 70, 229, 0.8)'; 
+            zIndex += 500; // Move selected wireframes above others
+          }
+          else if (isHovered) { 
+            bgColor = 'rgba(79, 70, 229, 0.1)'; 
+            borderColor = 'rgba(79, 70, 229, 0.5)'; 
+          }
 
           const rectStyle: any = {
             gridColumnStart: `${rect.x + 1}`,
@@ -312,7 +436,7 @@ export class VisualBlockGrid extends LitElement {
                 gridRowEnd: `span ${rect.h}`,
                 width: '100%',
                 height: '100%',
-                zIndex: 1001,
+                zIndex: 3000,
                 backgroundColor: 'rgba(79, 70, 229, 0.2)',
                 border: '1px dashed #4f46e5',
                 position: 'relative',
@@ -320,6 +444,8 @@ export class VisualBlockGrid extends LitElement {
               return html`<div class="ghost" style=${styleMap(ghostStyle)}></div>`;
             })
           : null}
+
+          ${this.marquee ? html`<div class="marquee" style=${styleMap(marqueeStyle)}></div>` : null}
       </div>
     `;
   }
@@ -327,7 +453,7 @@ export class VisualBlockGrid extends LitElement {
   static styles = css`
     :host { position: absolute; inset: 0; pointer-events: none; }
     .wireframe, .handle { pointer-events: auto; }
-    .grid-overlay { display: grid; width: 100%; height: 100%; pointer-events: auto; }
+    .grid-overlay { display: grid; width: 100%; height: 100%; pointer-events: auto; position: relative; }
 
     .wireframe {
       position: relative;
@@ -378,6 +504,14 @@ export class VisualBlockGrid extends LitElement {
     .handle.se { bottom: -5px; right: -5px; cursor: se-resize; }
 
     .ghost { pointer-events: none; }
+    
+    .marquee {
+        position: absolute;
+        border: 1px solid #4f46e5;
+        background: rgba(79, 70, 229, 0.1);
+        pointer-events: none;
+        z-index: 5000;
+    }
   `;
 }
 
