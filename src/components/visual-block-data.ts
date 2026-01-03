@@ -2,7 +2,7 @@ import { LitElement, html, css } from 'lit';
 import { ContextProvider } from '@lit/context';
 import { blockDataContext, uiStateContext } from '../contexts.js';
 import type { UiEventDetail } from '../defaults.js';
-import { noopAiClient, type AiClient } from '../services/ai.js';
+import { noopAiClient, type AiClient, createSystemPrompt } from '../services/ai.js';
 import { Icons } from '../icons.js';
 
 /**
@@ -28,9 +28,6 @@ export class VisualBlockData extends LitElement {
     error: { type: String, state: true },
     data: { type: Object, state: true },
     isPrompting: { type: Boolean, state: true },
-
-    // Optional AI client injection (safer than hardcoding API keys in the browser)
-    aiClient: { attribute: false },
 
     // UI state
     zoom: { type: Number, state: true },
@@ -94,9 +91,7 @@ export class VisualBlockData extends LitElement {
   error: string | null = null;
   data: any = null;
   isPrompting = false;
-
-  // safer injection point for AI calls
-  aiClient: AiClient = noopAiClient;
+  private _aiClient: AiClient = noopAiClient;
 
   // UI state
   zoom = 1;
@@ -112,6 +107,17 @@ export class VisualBlockData extends LitElement {
   constructor() {
     super();
     this.handleUIEvent = this.handleUIEvent.bind(this);
+  }
+
+  get aiClient(): AiClient {
+    return this._aiClient;
+  }
+
+  set aiClient(client: AiClient) {
+    if (this._aiClient !== client) {
+      this._aiClient = client;
+      this.requestUpdate('aiClient');
+    }
   }
 
   connectedCallback() {
@@ -174,13 +180,16 @@ export class VisualBlockData extends LitElement {
   private async generateSummary() {
     if (!this.data) return;
 
-    // Example prompt. Swap this out or enrich with real data as needed.
-    const blockCount = this.data.layout_lg?.positions?.length || 0;
-    const prompt = `Analyze this layout structure with ${blockCount} blocks. Provide a concise 2-sentence summary of its likely purpose and composition style.`;
-
+    const systemPrompt = createSystemPrompt(this.data);
+    const userPrompt = "Provide a concise, one-paragraph summary of this layout's likely purpose and composition style, suitable for a non-technical stakeholder.";
+    
     this.loading = true;
     try {
-      const summary = await this.aiClient(prompt);
+      const response = await this.aiClient(userPrompt, systemPrompt);
+      console.log('AI Full Response:', response);
+
+      const summary = response.text || JSON.stringify(response, null, 2);
+      
       this.modalState = { open: true, mode: 'result', title: '✨ Layout Summary', content: summary };
     } catch (e: any) {
       alert('AI Error: ' + e?.message);

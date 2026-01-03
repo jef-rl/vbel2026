@@ -89,6 +89,47 @@ export class VisualBlockInspector extends LitElement {
         font-size: 14px;
         text-align: center;
     }
+
+    .stack-list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 4px;
+        background: #f9fafb;
+    }
+
+    .stack-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 6px 8px;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 4px;
+        font-size: 12px;
+        color: #374151;
+    }
+    
+    .stack-item.active {
+        background: #eef2ff;
+        border-color: #c7d2fe;
+        color: #4338ca;
+        font-weight: 500;
+    }
+
+    .stack-item .id {
+        font-family: monospace;
+    }
+
+    .stack-item .z-val {
+        color: #6b7280;
+        font-size: 11px;
+    }
+    .stack-item.active .z-val {
+        color: #6366f1;
+    }
   `;
 
   render() {
@@ -149,6 +190,14 @@ export class VisualBlockInspector extends LitElement {
     const dataKeys = blockData ? Object.keys(blockData).length : 0;
     const firstKey = blockData ? Object.keys(blockData)[0] : 'N/A';
 
+    // Calculate Overlapping Stack
+    const overlaps = Object.values(rects).filter((r: any) => {
+        return r.x < rect.x + rect.w &&
+               r.x + r.w > rect.x &&
+               r.y < rect.y + rect.h &&
+               r.y + r.h > rect.y;
+    }).sort((a: any, b: any) => (b.z || 0) - (a.z || 0)); // Descending Z
+
     return html`
       <h3>Inspector</h3>
       
@@ -168,6 +217,18 @@ export class VisualBlockInspector extends LitElement {
             X: ${rect.x} &nbsp; Y: ${rect.y}<br>
             W: ${rect.w} &nbsp; H: ${rect.h}<br>
             Z: ${rect.z}
+        </div>
+      </div>
+
+      <div class="prop-group">
+        <div class="label">Z-Index Stack</div>
+        <div class="stack-list">
+          ${overlaps.map((r: any) => html`
+            <div class="stack-item ${r.id === id ? 'active' : ''}">
+                <span class="id">${r.id}</span>
+                <span class="z-val">Z: ${r.z || 0}</span>
+            </div>
+          `)}
         </div>
       </div>
 

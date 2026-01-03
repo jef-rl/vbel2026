@@ -8,46 +8,46 @@
       html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; }
       body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
       .root { display:flex; height:100%; width:100%; }
-      .left { flex: 1; position:relative; }
-      .right { width: 460px; border-left: 1px solid #e5e7eb; background:#fff; overflow:auto; padding:16px; }
-      .note { font-size: 12px; color:#6b7280; line-height: 1.5; }
-      code { background: #f3f4f6; padding: 2px 6px; border-radius: 4px; }
     </style>
   </head>
   <body>
     <div class="root">
-      <div class="left">
-        <!--
-          Provider (data + UI state)
-          - Click the floating button to load an id
-        -->
-        <visual-block-data id="data-provider" base-url="https://us-central1-lozzuck.cloudfunctions.net/blocks">
-          <visual-block-editor></visual-block-editor>
-        </visual-block-data>
-      </div>
+      <visual-block-data id="data-provider" base-url="https://us-central1-lozzuck.cloudfunctions.net/blocks">
+        <visual-block-editor></visual-block-editor>
+      </visual-block-data>
     </div>
 
     <!-- Use the built IIFE bundle for broader compatibility -->
     <script src="../dist/iife/visual-block-editor.iife.js"></script>
 
     <script>
-      // Ensure the global register function is called for the IIFE bundle
-      if (typeof window.VisualBlockEditor !== 'undefined' && typeof window.VisualBlockEditor.registerVisualBlockEditor === 'function') {
+      // The IIFE bundle is available on window.VisualBlockEditor
+      if (window.VisualBlockEditor && typeof window.VisualBlockEditor.registerVisualBlockEditor === 'function') {
         window.VisualBlockEditor.registerVisualBlockEditor();
       }
 
-      // Wait for the custom elements to be defined
-      customElements.whenDefined('visual-block-data').then(() => {
+      function configureGeminiClient(apiKey) {
         const dataProvider = document.getElementById('data-provider');
+        if (dataProvider && window.VisualBlockEditor && window.VisualBlockEditor.createGeminiClient) {
+          const geminiClient = window.VisualBlockEditor.createGeminiClient(apiKey);
+          dataProvider.aiClient = geminiClient;
+          console.log('Gemini AI Client configured.');
+        } else {
+          console.error('Could not configure Gemini client. Components not found.');
+        }
+      }
 
-        // Example AI Client configuration
-        dataProvider.aiClient = async (prompt, systemInstruction) => {
-          console.log('AI Request:', { prompt, systemInstruction });
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          return `This is a mock response for: "${prompt.substring(0, 30)}..."`;
-        };
-
-        console.log('AI Client configured.');
+      customElements.whenDefined('visual-block-data').then(() => {
+        // --- IMPORTANT ---
+        // Replace this with your actual Google AI API key
+        const GEMINI_API_KEY = 'AIzaSyCAz2tpYB4CIN_I89u8083PI7Yextik4rU'; 
+        
+        if (GEMINI_API_KEY === 'GEMINI_API_KEY') {
+          console.warn('Using a placeholder API key for Gemini. Please replace it in demo/index.html.');
+          alert('Please set your Gemini API key in demo/index.html to enable AI features.');
+        }
+        
+        configureGeminiClient(GEMINI_API_KEY);
       });
     </script>
   </body>

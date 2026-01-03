@@ -5,6 +5,7 @@
  * - Some apps want *just* classes and will register elements themselves.
  * - Others want a single import that registers everything (demo / script-tag usage).
  */
+import { liveAiClient, noopAiClient, createGeminiClient } from './services/ai.js';
 
 export function registerVisualBlockEditor() {
   // Order doesn't matter much, but registering provider/editor early avoids "unknown element" flashes.
@@ -21,3 +22,7 @@ export function registerVisualBlockEditor() {
 
 // Auto-register when someone imports the IIFE bundle (src/register.ts is its entry)
 registerVisualBlockEditor();
+
+// Export clients so they are available on the global `VisualBlockEditor` object
+// for the IIFE bundle.
+export { liveAiClient, noopAiClient, createGeminiClient };

@@ -223,10 +223,15 @@ export class VisualBlockGrid extends LitElement {
     if (!primaryIdToSelect) {
         const hitRects = Object.values(rects)
           .filter((r: any) => gridX >= r.x && gridX < r.x + r.w && gridY >= r.y && gridY < r.y + r.h)
-          .sort((a: any, b: any) => (b.z || 0) - (a.z || 0)) as any[];
+          .sort((a: any, b: any) => (b.z || 0) - (a.z || 0)) as any[]; // Sort DESCENDING Z
         
         if (hitRects.length > 0) {
-            primaryIdToSelect = hitRects[0].id; // Topmost rect by Z-index
+            const alreadySelectedHit = hitRects.find(r => selectedIds.includes(r.id));
+            if (alreadySelectedHit) {
+                 primaryIdToSelect = alreadySelectedHit.id;
+            } else {
+                 primaryIdToSelect = hitRects[0].id; // Topmost rect by Z-index
+            }
             interactionType = 'MOVE';
         }
     }
@@ -299,11 +304,30 @@ export class VisualBlockGrid extends LitElement {
     const gridDeltaY = Math.round(deltaY / gridConfig.stepY);
 
     if (this.ghost.type === 'MOVE') {
+      let constrainedDeltaX = gridDeltaX;
+      let constrainedDeltaY = gridDeltaY;
+
+      // Group bounding box calculation
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      Object.keys(this.ghost.items).forEach(id => {
+          const orig = this.ghost.items[id].originalRect;
+          minX = Math.min(minX, orig.x);
+          minY = Math.min(minY, orig.y);
+          maxX = Math.max(maxX, orig.x + orig.w);
+          maxY = Math.max(maxY, orig.y + orig.h);
+      });
+
+      // Clamp DeltaX based on group boundaries
+      if (minX + constrainedDeltaX < 0) constrainedDeltaX = -minX;
+      if (maxX + constrainedDeltaX > gridConfig.columns) constrainedDeltaX = gridConfig.columns - maxX;
+
+      // Clamp DeltaY (Top only)
+      if (minY + constrainedDeltaY < 0) constrainedDeltaY = -minY;
+
       Object.keys(this.ghost.items).forEach((id) => {
         const item = this.ghost.items[id];
         const orig = item.originalRect;
-        const constrained = clampGrid({ ...orig, x: orig.x + gridDeltaX, y: orig.y + gridDeltaY }, gridConfig.columns);
-        this.ghost.items[id].currentRect = { ...orig, ...constrained };
+        this.ghost.items[id].currentRect = { ...orig, x: orig.x + constrainedDeltaX, y: orig.y + constrainedDeltaY };
       });
       this.requestUpdate();
       return;
@@ -378,28 +402,31 @@ export class VisualBlockGrid extends LitElement {
         const { x, y } = this.ghost.startMouse;
         const { gridX, gridY } = this.getGridCoords(x, y);
 
+        // Get all items at the clicked location, sorted by Z (DESCENDING - top to bottom)
         const hitRects = Object.values(rects)
           .filter((r: any) => gridX >= r.x && gridX < r.x + r.w && gridY >= r.y && gridY < r.y + r.h)
-          .sort((a: any, b: any) => (b.z || 0) - (a.z || 0)) as any[]; // Sort ascending for cycling
+          .sort((a: any, b: any) => (b.z || 0) - (a.z || 0)) as any[];
 
         if (hitRects.length > 0) {
           let newSelection: string[] = [...(selectedIds ?? [])];
-          const currentPrimarySelectedId = this.ghost.primaryId; // Topmost rect under click
+          
+          // Use the selection that was active at the START of the mousedown
+          // This allows us to cycle relative to what was selected, not just what we "clicked" on in mousedown
+          const currentlySelectedId = this.ghost.primaryId;
 
           if (e.ctrlKey || e.metaKey || e.shiftKey) {
             // Toggle selection logic already performed in mousedown, no change needed for click
           } else { 
             // Cycling logic: Only cycle if the click happened on an element that was ALREADY selected
             // before the current mousedown started.
-            const wasAlreadySelected = this.ghost.originalSelectedIds.includes(currentPrimarySelectedId);
+            const wasAlreadySelected = this.ghost.originalSelectedIds.includes(currentlySelectedId);
 
             if (wasAlreadySelected) {
-                const currentIndexInHitRects = hitRects.findIndex((r: any) => r.id === currentPrimarySelectedId);
+                const currentIndexInHitRects = hitRects.findIndex((r: any) => r.id === currentlySelectedId);
                 const nextIndex = (currentIndexInHitRects + 1) % hitRects.length;
                 newSelection = [hitRects[nextIndex].id];
                 this.dispatchUiEvent('selection-change', newSelection);
             }
-            // If it wasn't already selected, the selection from mousedown stands (selecting the topmost).
           }
         } else {
           // If clicked on nothing and no drag, clear selection unless modifier held
